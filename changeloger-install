@@ -1,0 +1,102 @@
+#!/usr/bin/env sh
+set -eu
+
+app_name="changeloger"
+base_url="${CHANGELOGER_BASE_URL:-https://github.com/hiddenpathz/changeloger/releases/latest/download}"
+install_dir="${CHANGELOGER_INSTALL_DIR:-/usr/local/bin}"
+
+info() {
+    printf '%s\n' "$1"
+}
+
+fail() {
+    printf 'Ошибка: %s\n' "$1" >&2
+    exit 1
+}
+
+detect_artifact() {
+    os="$(uname -s)"
+    arch="$(uname -m)"
+
+    case "$os" in
+        Darwin)
+            case "$arch" in
+                arm64|x86_64)
+                    printf '%s\n' "changeloger-darwin-universal"
+                    ;;
+                *)
+                    fail "неподдерживаемая архитектура macOS: $arch"
+                    ;;
+            esac
+            ;;
+        Linux)
+            case "$arch" in
+                x86_64|amd64)
+                    printf '%s\n' "changeloger-linux-amd64"
+                    ;;
+                *)
+                    fail "неподдерживаемая архитектура Linux: $arch. Сейчас опубликован только linux-amd64."
+                    ;;
+            esac
+            ;;
+        *)
+            fail "неподдерживаемая ОС: $os"
+            ;;
+    esac
+}
+
+download() {
+    url="$1"
+    output="$2"
+
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "$url" -o "$output"
+        return
+    fi
+
+    if command -v wget >/dev/null 2>&1; then
+        wget -q "$url" -O "$output"
+        return
+    fi
+
+    fail "нужен curl или wget для скачивания бинарника"
+}
+
+install_binary() {
+    source_path="$1"
+    target_path="$install_dir/$app_name"
+
+    if [ -d "$install_dir" ] && [ -w "$install_dir" ]; then
+        install -m 0755 "$source_path" "$target_path"
+        return
+    fi
+
+    if [ ! -d "$install_dir" ] && mkdir -p "$install_dir" 2>/dev/null; then
+        install -m 0755 "$source_path" "$target_path"
+        return
+    fi
+
+    if command -v sudo >/dev/null 2>&1; then
+        sudo mkdir -p "$install_dir"
+        sudo install -m 0755 "$source_path" "$target_path"
+        return
+    fi
+
+    fail "нет прав на запись в $install_dir и sudo недоступен"
+}
+
+artifact="$(detect_artifact)"
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf "$tmp_dir"' EXIT INT TERM
+
+url="$base_url/$artifact"
+tmp_binary="$tmp_dir/$app_name"
+
+info "Скачиваю $url"
+download "$url" "$tmp_binary"
+chmod +x "$tmp_binary"
+
+install_binary "$tmp_binary"
+
+info "Готово: $install_dir/$app_name"
+info "Проверь: $app_name запускается из директории проекта с .env и CHANGELOG.md"
