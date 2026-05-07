@@ -1,4 +1,5 @@
 /bin/
 /dist/
 /.tmp-release/
-/changeloger
+/changelogger
+.DS_Store

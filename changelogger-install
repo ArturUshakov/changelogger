@@ -1,9 +1,9 @@
 #!/usr/bin/env sh
 set -eu
 
-app_name="changeloger"
-base_url="${CHANGELOGER_BASE_URL:-https://github.com/hiddenpathz/changeloger/releases/latest/download}"
-install_dir="${CHANGELOGER_INSTALL_DIR:-/usr/local/bin}"
+app_name="changelogger"
+base_url="${CHANGELOGGER_BASE_URL:-https://github.com/hiddenpathz/changelogger/releases/latest/download}"
+install_dir="${CHANGELOGGER_INSTALL_DIR:-/usr/local/bin}"
 
 info() {
     printf '%s\n' "$1"
@@ -22,7 +22,7 @@ detect_artifact() {
         Darwin)
             case "$arch" in
                 arm64|x86_64)
-                    printf '%s\n' "changeloger-darwin-universal"
+                    printf '%s\n' "changelogger-darwin-universal"
                     ;;
                 *)
                     fail "неподдерживаемая архитектура macOS: $arch"
@@ -32,7 +32,7 @@ detect_artifact() {
         Linux)
             case "$arch" in
                 x86_64|amd64)
-                    printf '%s\n' "changeloger-linux-amd64"
+                    printf '%s\n' "changelogger-linux-amd64"
                     ;;
                 *)
                     fail "неподдерживаемая архитектура Linux: $arch. Сейчас опубликован только linux-amd64."

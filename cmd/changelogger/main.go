@@ -5,11 +5,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/hiddenpathz/changeloger/internal/changeloger"
+	"github.com/hiddenpathz/changelogger/internal/changelogger"
 )
 
 func main() {
-	app := changeloger.NewApp(os.Args[1:], os.Stdin, os.Stdout, time.Now, changeloger.OSRunner{})
+	app := changelogger.NewApp(os.Args[1:], os.Stdin, os.Stdout, time.Now, changelogger.OSRunner{})
 
 	if err := app.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "\033[01;31mОшибка: %v\n\033[0m", err)

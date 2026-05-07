@@ -1,4 +1,4 @@
-package changeloger
+package changelogger
 
 import (
 	"fmt"

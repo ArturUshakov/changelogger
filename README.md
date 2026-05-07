@@ -1,30 +1,30 @@
-# Go Changeloger
+# Go Changelogger
 
-Отдельная Go-реализация `changeloger`, которую можно собрать в один бинарник и запускать без PHP и Composer на машине пользователя.
+Отдельная Go-реализация `changelogger`, которую можно собрать в один бинарник и запускать без PHP и Composer на машине пользователя.
 
 ## Сборка
 
 ```bash
-go build -o ./bin/changeloger ./cmd/changeloger
+go build -o ./bin/changelogger ./cmd/changelogger
 ```
 
-После сборки пользователю нужен только файл `bin/changeloger`.
+После сборки пользователю нужен только файл `bin/changelogger`.
 
 ## Установка
 
 После публикации release-артефактов установка выполняется одной командой:
 
 ```bash
-curl -fsSL https://github.com/hiddenpathz/changeloger/releases/latest/download/changeloger-install | sh
+curl -fsSL https://github.com/hiddenpathz/changelogger/releases/latest/download/changelogger-install | sh
 ```
 
-Installer сам определит ОС и поставит бинарник в `/usr/local/bin/changeloger`.
-После этого `changeloger` можно запускать из корня любого проекта с `.env` и `CHANGELOG.md`.
+Installer сам определит ОС и поставит бинарник в `/usr/local/bin/changelogger`.
+После этого `changelogger` можно запускать из корня любого проекта с `.env` и `CHANGELOG.md`.
 
 Если нужен другой каталог установки:
 
 ```bash
-curl -fsSL https://github.com/hiddenpathz/changeloger/releases/latest/download/changeloger-install | CHANGELOGER_INSTALL_DIR="$HOME/bin" sh
+curl -fsSL https://github.com/hiddenpathz/changelogger/releases/latest/download/changelogger-install | CHANGELOGGER_INSTALL_DIR="$HOME/bin" sh
 ```
 
 ## Release-артефакты
@@ -38,9 +38,9 @@ curl -fsSL https://github.com/hiddenpathz/changeloger/releases/latest/download/c
 Скрипт создаст:
 
 ```text
-dist/changeloger-darwin-universal
-dist/changeloger-linux-amd64
-dist/changeloger-install
+dist/changelogger-darwin-universal
+dist/changelogger-linux-amd64
+dist/changelogger-install
 dist/checksums.txt
 ```
 
@@ -48,7 +48,7 @@ dist/checksums.txt
 
 ```bash
 ./scripts/build-release.sh
-CHANGELOGER_BASE_URL="file://$PWD/dist" CHANGELOGER_INSTALL_DIR="$HOME/bin" ./changeloger-install
+CHANGELOGGER_BASE_URL="file://$PWD/dist" CHANGELOGGER_INSTALL_DIR="$HOME/bin" ./changelogger-install
 ```
 
 ## Публикация релиза без CI
@@ -59,22 +59,22 @@ CHANGELOGER_BASE_URL="file://$PWD/dist" CHANGELOGER_INSTALL_DIR="$HOME/bin" ./ch
    ./scripts/build-release.sh
    ```
 
-2. Создайте GitHub Release в `https://github.com/hiddenpathz/changeloger`.
+2. Создайте GitHub Release в `https://github.com/hiddenpathz/changelogger`.
 
 3. Приложите к release все файлы из `dist/`:
 
    ```text
-   changeloger-darwin-universal
-   changeloger-linux-amd64
-   changeloger-install
+   changelogger-darwin-universal
+   changelogger-linux-amd64
+   changelogger-install
    checksums.txt
    ```
 
 4. После публикации проверьте установку:
 
    ```bash
-   curl -fsSL https://github.com/hiddenpathz/changeloger/releases/latest/download/changeloger-install | sh
-   changeloger
+   curl -fsSL https://github.com/hiddenpathz/changelogger/releases/latest/download/changelogger-install | sh
+   changelogger
    ```
 
 ## Запуск
@@ -82,8 +82,8 @@ CHANGELOGER_BASE_URL="file://$PWD/dist" CHANGELOGER_INSTALL_DIR="$HOME/bin" ./ch
 Запускать нужно из корня проекта, где лежит `.env`:
 
 ```bash
-changeloger
-changeloger https://gitlab.some.ru/your.repo.ru/-/tags/
+changelogger
+changelogger https://gitlab.some.ru/your.repo.ru/-/tags/
 ```
 
 Поддерживаемые переменные `.env`:
