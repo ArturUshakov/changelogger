@@ -338,6 +338,100 @@ func TestAppRunUsesSavedPreferencesWithoutAskingAgain(t *testing.T) {
 	}
 }
 
+func TestAppRunAcceptsDefaultYesForFinalConfirmation(t *testing.T) {
+	dir := t.TempDir()
+	chdir(t, dir)
+	setUserConfig(t, dir)
+
+	writeFile(t, filepath.Join(dir, ".env"), strings.Join([]string{
+		"REPOSITORY_LINK=https://git.example/group/app/-/tags/",
+		"CHANGELOG_PATH=./CHANGELOG.md",
+		"TASK_SYSTEM_LINK=https://tracker.example/item/{code}",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(dir, "CHANGELOG.md"), "# History\n")
+
+	branch := "feature/OPS-AB111111-CD111111-assign-to-changelog"
+	runner := newScriptedRunner(map[string][]runnerResult{
+		runnerKey("git", "rev-list", "--tags", "--max-count=1"): {{output: "tagcommit\n"}},
+		runnerKey("git", "describe", "--tags", "tagcommit"):     {{output: "1.2.3\n"}},
+		runnerKey("git", "rev-parse", "origin/master"):          {{output: "master123\n"}},
+		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..develop"): {{
+			output: "001|Dev One|[OPS-AB111111-CD111111] fix: исправлена проверка|2026-01-01",
+		}},
+		runnerKey("git", "cherry", "-v", "master123", "1.2.3"): {{output: ""}},
+		runnerKey("git", "branch", "--list", branch):           {{output: ""}},
+		runnerKey("git", "checkout", "develop"):                {{}},
+		runnerKey("git", "checkout", "-b", branch):             {{}},
+	})
+
+	var output bytes.Buffer
+	input := strings.NewReader("y\n\n\n\n\nn\n\n")
+	app := NewApp(nil, input, &output, fixedTime, runner)
+
+	if err := app.Run(); err != nil {
+		t.Fatalf("Run() error = %v\noutput:\n%s", err, output.String())
+	}
+
+	changelog := readFile(t, filepath.Join(dir, "CHANGELOG.md"))
+	if !strings.Contains(changelog, "  - Исправлена проверка [Заявка](https://tracker.example/item/AB111111)\n") {
+		t.Fatalf("CHANGELOG.md does not contain generated change:\n%s", changelog)
+	}
+	if !strings.Contains(output.String(), "Все верно?") || !strings.Contains(output.String(), "Enter - y") {
+		t.Fatalf("output does not show default yes confirmation:\n%s", output.String())
+	}
+}
+
+func TestAppRunSkipsFinalConfirmationWhenCommitPreferenceIsSaved(t *testing.T) {
+	dir := t.TempDir()
+	chdir(t, dir)
+	setUserConfigContent(t, dir, `{
+  "taskSystemLink": "https://tracker.example/item/{code}",
+  "changelogPath": "./CHANGELOG.md",
+  "taskLinkMode": "always",
+  "commitMode": "never"
+}
+`)
+
+	writeFile(t, filepath.Join(dir, ".env"), strings.Join([]string{
+		"REPOSITORY_LINK=https://git.example/group/app/-/tags/",
+		"CHANGELOG_PATH=./CHANGELOG.md",
+		"TASK_SYSTEM_LINK=https://tracker.example/item/{code}",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(dir, "CHANGELOG.md"), "# History\n")
+
+	branch := "feature/OPS-AB111111-CD111111-assign-to-changelog"
+	runner := newScriptedRunner(map[string][]runnerResult{
+		runnerKey("git", "rev-list", "--tags", "--max-count=1"): {{output: "tagcommit\n"}},
+		runnerKey("git", "describe", "--tags", "tagcommit"):     {{output: "1.2.3\n"}},
+		runnerKey("git", "rev-parse", "origin/master"):          {{output: "master123\n"}},
+		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..develop"): {{
+			output: "001|Dev One|[OPS-AB111111-CD111111] fix: исправлена проверка|2026-01-01",
+		}},
+		runnerKey("git", "cherry", "-v", "master123", "1.2.3"): {{output: ""}},
+		runnerKey("git", "branch", "--list", branch):           {{output: ""}},
+		runnerKey("git", "checkout", "develop"):                {{}},
+		runnerKey("git", "checkout", "-b", branch):             {{}},
+	})
+
+	var output bytes.Buffer
+	input := strings.NewReader("\n\n")
+	app := NewApp(nil, input, &output, fixedTime, runner)
+
+	if err := app.Run(); err != nil {
+		t.Fatalf("Run() error = %v\noutput:\n%s", err, output.String())
+	}
+
+	if strings.Contains(output.String(), "Все верно?") {
+		t.Fatalf("output contains final confirmation despite saved commit preference:\n%s", output.String())
+	}
+	changelog := readFile(t, filepath.Join(dir, "CHANGELOG.md"))
+	if !strings.Contains(changelog, "  - Исправлена проверка [Заявка](https://tracker.example/item/AB111111)\n") {
+		t.Fatalf("CHANGELOG.md does not contain generated change:\n%s", changelog)
+	}
+}
+
 func TestAppRunWritesChangelogWithoutCommitWhenCommitIsDeclined(t *testing.T) {
 	dir := t.TempDir()
 	chdir(t, dir)

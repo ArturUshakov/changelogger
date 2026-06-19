@@ -108,8 +108,10 @@ func (app App) Run() error {
 		return err
 	}
 
-	if err := app.askConfirmation("Все верно?"); err != nil {
-		return err
+	if normalizePreferenceMode(config.CommitMode) == preferenceAsk {
+		if err := app.askConfirmationDefaultYes("Все верно?"); err != nil {
+			return err
+		}
 	}
 
 	if err := changelog.Write(config.ChangelogPath, newVersion.String(), answerBody); err != nil {
@@ -195,6 +197,22 @@ func (app App) askConfirmation(question string) error {
 	}
 
 	return fmt.Errorf("выполнение команды отменено")
+}
+
+func (app App) askConfirmationDefaultYes(question string) error {
+	app.print(question + " (y/n, Enter - y): ")
+
+	answer, err := app.readLine()
+	if err != nil {
+		return err
+	}
+
+	switch strings.ToLower(answer) {
+	case "", "y", "yes":
+		return nil
+	default:
+		return fmt.Errorf("выполнение команды отменено")
+	}
 }
 
 func (app App) taskLinkChoice(mode string) (bool, error) {
