@@ -2,6 +2,7 @@ package changelogger
 
 import (
 	"fmt"
+	"net/url"
 	"os/exec"
 	"strings"
 )
@@ -57,6 +58,61 @@ func (git Git) MasterCommit() (string, error) {
 	}
 
 	return strings.TrimSpace(commit), nil
+}
+
+func (git Git) RepositoryLink() (string, error) {
+	remote, err := git.runner.Run("git", "remote", "get-url", "origin")
+	if err != nil {
+		return "", fmt.Errorf("получить origin remote: %w", err)
+	}
+
+	link, err := RepositoryLinkFromRemote(remote)
+	if err != nil {
+		return "", err
+	}
+
+	return link, nil
+}
+
+func RepositoryLinkFromRemote(remote string) (string, error) {
+	remote = strings.TrimSpace(remote)
+	if remote == "" {
+		return "", fmt.Errorf("origin remote пустой")
+	}
+
+	if strings.HasPrefix(remote, "git@") {
+		withoutUser := strings.TrimPrefix(remote, "git@")
+		host, path, ok := strings.Cut(withoutUser, ":")
+		if !ok {
+			return "", fmt.Errorf("неподдерживаемый origin remote %q", remote)
+		}
+
+		return repositoryTagsLink("https", host, path)
+	}
+
+	parsed, err := url.Parse(remote)
+	if err != nil {
+		return "", fmt.Errorf("разобрать origin remote %q: %w", remote, err)
+	}
+
+	switch parsed.Scheme {
+	case "http", "https":
+		return repositoryTagsLink(parsed.Scheme, parsed.Host, parsed.Path)
+	case "ssh":
+		return repositoryTagsLink("https", parsed.Host, parsed.Path)
+	default:
+		return "", fmt.Errorf("неподдерживаемый origin remote %q", remote)
+	}
+}
+
+func repositoryTagsLink(scheme string, host string, path string) (string, error) {
+	path = strings.Trim(path, "/")
+	path = strings.TrimSuffix(path, ".git")
+	if host == "" || path == "" {
+		return "", fmt.Errorf("неподдерживаемый origin remote")
+	}
+
+	return fmt.Sprintf("%s://%s/%s/-/tags/", scheme, host, path), nil
 }
 
 func (git Git) ChangeLines(lastTag string, masterCommit string) ([]string, error) {
