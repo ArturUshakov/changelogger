@@ -14,6 +14,8 @@ type Config struct {
 	ChangelogPath  string `json:"changelogPath"`
 	BranchPrefix   string `json:"branchPrefix"`
 	TaskSystemLink string `json:"taskSystemLink"`
+	TaskLinkMode   string `json:"taskLinkMode,omitempty"`
+	CommitMode     string `json:"commitMode,omitempty"`
 }
 
 func LoadConfig(path string) (Config, error) {
@@ -51,6 +53,8 @@ func LoadConfigFiles(globalPath string, envPath string) (Config, error) {
 		ChangelogPath:  valueOrDefault(global.ChangelogPath, "./CHANGELOG.md"),
 		BranchPrefix:   values["BRANCH_PREFIX"],
 		TaskSystemLink: global.TaskSystemLink,
+		TaskLinkMode:   normalizePreferenceMode(global.TaskLinkMode),
+		CommitMode:     normalizePreferenceMode(global.CommitMode),
 	}
 
 	if values["CHANGELOG_PATH"] != "" {
@@ -115,6 +119,33 @@ func writeGlobalConfigTemplate(path string, config Config) error {
 	}
 
 	return nil
+}
+
+func saveGlobalConfig(update func(*Config)) error {
+	path, err := globalConfigPath()
+	if err != nil {
+		return err
+	}
+
+	config, err := readGlobalConfig(path)
+	if err != nil {
+		return err
+	}
+
+	update(&config)
+
+	return writeGlobalConfigTemplate(path, config)
+}
+
+func normalizePreferenceMode(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case preferenceAlways:
+		return preferenceAlways
+	case preferenceNever:
+		return preferenceNever
+	default:
+		return preferenceAsk
+	}
 }
 
 func writeProjectEnvTemplate(path string, global Config) error {

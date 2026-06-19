@@ -44,7 +44,7 @@ func TestAppRunWritesChangelogAndRunsGitWorkflow(t *testing.T) {
 	})
 
 	var output bytes.Buffer
-	input := strings.NewReader("y\n\n\ny\ny\ny\n")
+	input := strings.NewReader("y\n\n\n\ny\ny\n\ny\n")
 	app := NewApp(nil, input, &output, fixedTime, runner)
 
 	if err := app.Run(); err != nil {
@@ -117,7 +117,7 @@ func TestAppRunUsesTagLinkArgumentBeforeEnvAndGitRemote(t *testing.T) {
 		runnerKey("git", "branch", "-D", branch):                             {{}},
 	})
 
-	input := strings.NewReader("y\n\n\ny\ny\ny\n")
+	input := strings.NewReader("y\n\n\n\ny\ny\n\ny\n")
 	app := NewApp([]string{"https://git.example/group/arg-app/-/tags/"}, input, &bytes.Buffer{}, fixedTime, runner)
 
 	if err := app.Run(); err != nil {
@@ -167,7 +167,7 @@ func TestAppRunCanWriteChangelogWithoutTaskLinks(t *testing.T) {
 		runnerKey("git", "branch", "-D", branch):                             {{}},
 	})
 
-	input := strings.NewReader("n\n\n\ny\ny\ny\n")
+	input := strings.NewReader("n\n\n\n\ny\ny\n\ny\n")
 	app := NewApp(nil, input, &bytes.Buffer{}, fixedTime, runner)
 
 	if err := app.Run(); err != nil {
@@ -215,7 +215,7 @@ func TestAppRunDoesNotAddTaskLinksByDefault(t *testing.T) {
 	})
 
 	var output bytes.Buffer
-	input := strings.NewReader("\n\n\ny\ny\ny\n")
+	input := strings.NewReader("\n\n\n\ny\ny\n\ny\n")
 	app := NewApp(nil, input, &output, fixedTime, runner)
 
 	if err := app.Run(); err != nil {
@@ -228,6 +228,113 @@ func TestAppRunDoesNotAddTaskLinksByDefault(t *testing.T) {
 	}
 	if !strings.Contains(output.String(), "Enter - n") {
 		t.Fatalf("output does not show default answer for task links:\n%s", output.String())
+	}
+}
+
+func TestAppRunCanSaveTaskLinkAndCommitPreferences(t *testing.T) {
+	dir := t.TempDir()
+	chdir(t, dir)
+	setUserConfig(t, dir)
+
+	writeFile(t, filepath.Join(dir, ".env"), strings.Join([]string{
+		"REPOSITORY_LINK=https://git.example/group/app/-/tags/",
+		"CHANGELOG_PATH=./CHANGELOG.md",
+		"TASK_SYSTEM_LINK=https://tracker.example/item/{code}",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(dir, "CHANGELOG.md"), "# History\n")
+
+	branch := "feature/OPS-AB111111-CD111111-assign-to-changelog"
+	runner := newScriptedRunner(map[string][]runnerResult{
+		runnerKey("git", "rev-list", "--tags", "--max-count=1"): {{output: "tagcommit\n"}},
+		runnerKey("git", "describe", "--tags", "tagcommit"):     {{output: "1.2.3\n"}},
+		runnerKey("git", "rev-parse", "origin/master"):          {{output: "master123\n"}},
+		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..develop"): {{
+			output: "001|Dev One|[OPS-AB111111-CD111111] fix: исправлена проверка|2026-01-01",
+		}},
+		runnerKey("git", "cherry", "-v", "master123", "1.2.3"):               {{output: ""}},
+		runnerKey("git", "branch", "--list", branch):                         {{output: ""}},
+		runnerKey("git", "checkout", "develop"):                              {{}, {}},
+		runnerKey("git", "checkout", "-b", branch):                           {{}},
+		runnerKey("git", "add", "./CHANGELOG.md"):                            {{}},
+		runnerKey("git", "commit", "-m", "wip: Отредактирован CHANGELOG.md"): {{}},
+		runnerKey("git", "push", "origin", branch):                           {{}},
+		runnerKey("git", "branch", "-D", branch):                             {{}},
+	})
+
+	var output bytes.Buffer
+	input := strings.NewReader("y\n1\n\n\ny\ny\n1\ny\n")
+	app := NewApp(nil, input, &output, fixedTime, runner)
+
+	if err := app.Run(); err != nil {
+		t.Fatalf("Run() error = %v\noutput:\n%s", err, output.String())
+	}
+
+	config := readFile(t, globalConfigFile(t))
+	for _, want := range []string{
+		`"taskLinkMode": "always"`,
+		`"commitMode": "always"`,
+	} {
+		if !strings.Contains(config, want) {
+			t.Fatalf("global config does not contain %q:\n%s", want, config)
+		}
+	}
+}
+
+func TestAppRunUsesSavedPreferencesWithoutAskingAgain(t *testing.T) {
+	dir := t.TempDir()
+	chdir(t, dir)
+	setUserConfigContent(t, dir, `{
+  "taskSystemLink": "https://tracker.example/item/{code}",
+  "changelogPath": "./CHANGELOG.md",
+  "taskLinkMode": "never",
+  "commitMode": "never"
+}
+`)
+
+	writeFile(t, filepath.Join(dir, ".env"), strings.Join([]string{
+		"REPOSITORY_LINK=https://git.example/group/app/-/tags/",
+		"CHANGELOG_PATH=./CHANGELOG.md",
+		"TASK_SYSTEM_LINK=https://tracker.example/item/{code}",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(dir, "CHANGELOG.md"), "# History\n")
+
+	branch := "feature/OPS-AB111111-CD111111-assign-to-changelog"
+	runner := newScriptedRunner(map[string][]runnerResult{
+		runnerKey("git", "rev-list", "--tags", "--max-count=1"): {{output: "tagcommit\n"}},
+		runnerKey("git", "describe", "--tags", "tagcommit"):     {{output: "1.2.3\n"}},
+		runnerKey("git", "rev-parse", "origin/master"):          {{output: "master123\n"}},
+		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..develop"): {{
+			output: "001|Dev One|[OPS-AB111111-CD111111] fix: исправлена проверка|2026-01-01",
+		}},
+		runnerKey("git", "cherry", "-v", "master123", "1.2.3"): {{output: ""}},
+		runnerKey("git", "branch", "--list", branch):           {{output: ""}},
+		runnerKey("git", "checkout", "develop"):                {{}},
+		runnerKey("git", "checkout", "-b", branch):             {{}},
+	})
+
+	var output bytes.Buffer
+	input := strings.NewReader("\n\ny\n")
+	app := NewApp(nil, input, &output, fixedTime, runner)
+
+	if err := app.Run(); err != nil {
+		t.Fatalf("Run() error = %v\noutput:\n%s", err, output.String())
+	}
+
+	changelog := readFile(t, filepath.Join(dir, "CHANGELOG.md"))
+	if strings.Contains(changelog, "[Заявка]") || strings.Contains(changelog, "tracker.example") {
+		t.Fatalf("changelog contains task link with saved never mode:\n%s", changelog)
+	}
+
+	for _, unexpected := range []string{
+		"Добавлять ссылку на заявку",
+		"Создать коммит?",
+		"Запомнить",
+	} {
+		if strings.Contains(output.String(), unexpected) {
+			t.Fatalf("output contains %q despite saved preferences:\n%s", unexpected, output.String())
+		}
 	}
 }
 
@@ -260,7 +367,7 @@ func TestAppRunWritesChangelogWithoutCommitWhenCommitIsDeclined(t *testing.T) {
 	})
 
 	var output bytes.Buffer
-	input := strings.NewReader("y\n\n\ny\nn\n")
+	input := strings.NewReader("y\n\n\n\ny\nn\n\n")
 	app := NewApp(nil, input, &output, fixedTime, runner)
 
 	if err := app.Run(); err != nil {
@@ -429,20 +536,32 @@ func TestReadLineTrimsWhitespaceAndAllowsEOF(t *testing.T) {
 func setUserConfig(t *testing.T, dir string) {
 	t.Helper()
 
+	setUserConfigContent(t, dir, `{
+  "taskSystemLink": "https://tracker.example/item/{code}",
+  "changelogPath": "./CHANGELOG.md"
+}
+`)
+}
+
+func setUserConfigContent(t *testing.T, dir string, content string) {
+	t.Helper()
+
 	t.Setenv("HOME", dir)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, "xdg-config"))
 	t.Setenv("APPDATA", filepath.Join(dir, "appdata"))
+
+	writeFile(t, globalConfigFile(t), content)
+}
+
+func globalConfigFile(t *testing.T) string {
+	t.Helper()
 
 	configDir, err := os.UserConfigDir()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	writeFile(t, filepath.Join(configDir, "changelogger", "config.json"), `{
-  "taskSystemLink": "https://tracker.example/item/{code}",
-  "changelogPath": "./CHANGELOG.md"
-}
-`)
+	return filepath.Join(configDir, "changelogger", "config.json")
 }
 
 func chdir(t *testing.T, dir string) {

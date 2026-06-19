@@ -35,6 +35,8 @@ IGNORED_LINE
 		ChangelogPath:  "./docs/CHANGELOG.md",
 		BranchPrefix:   "OPS",
 		TaskSystemLink: "https://tasks.example/card?code=",
+		TaskLinkMode:   "ask",
+		CommitMode:     "ask",
 	}
 	if config != want {
 		t.Fatalf("LoadConfigFiles() = %#v, want %#v", config, want)

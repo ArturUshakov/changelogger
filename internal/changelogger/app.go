@@ -70,7 +70,7 @@ func (app App) Run() error {
 	}
 	branchTask := DetectBranchTask(commitLines)
 
-	includeTaskLinks, err := app.askYesNoWithDefaultNo("Добавлять ссылку на заявку в CHANGELOG.md?")
+	includeTaskLinks, err := app.taskLinkChoice(config.TaskLinkMode)
 	if err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func (app App) Run() error {
 	}
 	app.printColored("Файл CHANGELOG.md успешно отредактирован:  \n", green)
 
-	shouldCommit, err := app.askYesNo("Создать коммит?")
+	shouldCommit, err := app.commitChoice(config.CommitMode)
 	if err != nil {
 		return err
 	}
@@ -197,6 +197,70 @@ func (app App) askConfirmation(question string) error {
 	return fmt.Errorf("выполнение команды отменено")
 }
 
+func (app App) taskLinkChoice(mode string) (bool, error) {
+	switch normalizePreferenceMode(mode) {
+	case preferenceAlways:
+		return true, nil
+	case preferenceNever:
+		return false, nil
+	}
+
+	enabled, err := app.askYesNoWithDefaultNo("Добавлять ссылку на заявку в CHANGELOG.md?")
+	if err != nil {
+		return false, err
+	}
+
+	saveMode, err := app.askPreferenceMode(
+		"Запомнить выбор для ссылок на заявку?",
+		"всегда добавлять",
+		"никогда не добавлять",
+	)
+	if err != nil {
+		return false, err
+	}
+	if saveMode != preferenceAsk {
+		if err := saveGlobalConfig(func(config *Config) {
+			config.TaskLinkMode = saveMode
+		}); err != nil {
+			return false, err
+		}
+	}
+
+	return enabled, nil
+}
+
+func (app App) commitChoice(mode string) (bool, error) {
+	switch normalizePreferenceMode(mode) {
+	case preferenceAlways:
+		return true, nil
+	case preferenceNever:
+		return false, nil
+	}
+
+	enabled, err := app.askYesNo("Создать коммит?")
+	if err != nil {
+		return false, err
+	}
+
+	saveMode, err := app.askPreferenceMode(
+		"Запомнить выбор для коммита?",
+		"всегда создавать",
+		"никогда не создавать",
+	)
+	if err != nil {
+		return false, err
+	}
+	if saveMode != preferenceAsk {
+		if err := saveGlobalConfig(func(config *Config) {
+			config.CommitMode = saveMode
+		}); err != nil {
+			return false, err
+		}
+	}
+
+	return enabled, nil
+}
+
 func (app App) askYesNo(question string) (bool, error) {
 	app.print(question + " (y/n): ")
 
@@ -223,6 +287,24 @@ func (app App) readYesNo() (bool, error) {
 	}
 }
 
+func (app App) askPreferenceMode(question string, alwaysLabel string, neverLabel string) (string, error) {
+	app.print(question + "\n 1 - " + alwaysLabel + "\n 2 - " + neverLabel + "\n Enter - спрашивать каждый раз\n> ")
+
+	answer, err := app.readLine()
+	if err != nil {
+		return "", err
+	}
+
+	switch strings.ToLower(answer) {
+	case "1", preferenceAlways:
+		return preferenceAlways, nil
+	case "2", preferenceNever:
+		return preferenceNever, nil
+	default:
+		return preferenceAsk, nil
+	}
+}
+
 func (app App) readLine() (string, error) {
 	line, err := app.input.ReadString('\n')
 	if err != nil && err != io.EOF {
@@ -243,4 +325,10 @@ func (app App) printColored(message string, color string) {
 const (
 	green  = "32"
 	yellow = "33"
+)
+
+const (
+	preferenceAsk    = "ask"
+	preferenceAlways = "always"
+	preferenceNever  = "never"
 )
