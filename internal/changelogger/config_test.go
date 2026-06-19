@@ -37,6 +37,7 @@ IGNORED_LINE
 		TaskSystemLink: "https://tasks.example/card?code=",
 		TaskLinkMode:   "ask",
 		CommitMode:     "ask",
+		ChangelogMode:  "ask",
 	}
 	if config != want {
 		t.Fatalf("LoadConfigFiles() = %#v, want %#v", config, want)
@@ -186,6 +187,7 @@ func TestWriteGlobalConfigTemplateOmitsProjectOnlyFields(t *testing.T) {
 		ChangelogPath:  "./CHANGELOG.md",
 		TaskLinkMode:   "always",
 		CommitMode:     "never",
+		ChangelogMode:  "current",
 	})
 	if err != nil {
 		t.Fatalf("writeGlobalConfigTemplate() error = %v", err)
@@ -197,7 +199,7 @@ func TestWriteGlobalConfigTemplateOmitsProjectOnlyFields(t *testing.T) {
 			t.Fatalf("global config contains project-only field %q:\n%s", forbidden, content)
 		}
 	}
-	for _, want := range []string{"taskSystemLink", "changelogPath", "taskLinkMode", "commitMode"} {
+	for _, want := range []string{"taskSystemLink", "changelogPath", "taskLinkMode", "commitMode", "changelogMode"} {
 		if !strings.Contains(content, want) {
 			t.Fatalf("global config does not contain %q:\n%s", want, content)
 		}

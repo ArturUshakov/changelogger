@@ -44,7 +44,7 @@ func TestAppRunWritesChangelogAndRunsGitWorkflow(t *testing.T) {
 	})
 
 	var output bytes.Buffer
-	input := strings.NewReader("y\n\n\n\ny\ny\n\ny\n")
+	input := strings.NewReader("2\ny\n\n\n\ny\ny\n\ny\n")
 	app := NewApp(nil, input, &output, fixedTime, runner)
 
 	if err := app.Run(); err != nil {
@@ -117,7 +117,7 @@ func TestAppRunUsesTagLinkArgumentBeforeEnvAndGitRemote(t *testing.T) {
 		runnerKey("git", "branch", "-D", branch):                             {{}},
 	})
 
-	input := strings.NewReader("y\n\n\n\ny\ny\n\ny\n")
+	input := strings.NewReader("2\ny\n\n\n\ny\ny\n\ny\n")
 	app := NewApp([]string{"https://git.example/group/arg-app/-/tags/"}, input, &bytes.Buffer{}, fixedTime, runner)
 
 	if err := app.Run(); err != nil {
@@ -167,7 +167,7 @@ func TestAppRunCanWriteChangelogWithoutTaskLinks(t *testing.T) {
 		runnerKey("git", "branch", "-D", branch):                             {{}},
 	})
 
-	input := strings.NewReader("n\n\n\n\ny\ny\n\ny\n")
+	input := strings.NewReader("2\nn\n\n\n\ny\ny\n\ny\n")
 	app := NewApp(nil, input, &bytes.Buffer{}, fixedTime, runner)
 
 	if err := app.Run(); err != nil {
@@ -263,7 +263,7 @@ func TestAppRunCanSaveTaskLinkAndCommitPreferences(t *testing.T) {
 	})
 
 	var output bytes.Buffer
-	input := strings.NewReader("y\n1\n\n\ny\ny\n1\ny\n")
+	input := strings.NewReader("\ny\n1\n\ny\ny\n1\n")
 	app := NewApp(nil, input, &output, fixedTime, runner)
 
 	if err := app.Run(); err != nil {
@@ -338,6 +338,124 @@ func TestAppRunUsesSavedPreferencesWithoutAskingAgain(t *testing.T) {
 	}
 }
 
+func TestAppRunCanWriteChangelogOnCurrentBranch(t *testing.T) {
+	dir := t.TempDir()
+	chdir(t, dir)
+	setUserConfigContent(t, dir, `{
+  "taskSystemLink": "https://tracker.example/item/{code}",
+  "changelogPath": "./CHANGELOG.md",
+  "taskLinkMode": "always",
+  "commitMode": "always"
+}
+`)
+
+	writeFile(t, filepath.Join(dir, ".env"), strings.Join([]string{
+		"REPOSITORY_LINK=https://git.example/group/app/-/tags/",
+		"CHANGELOG_PATH=./CHANGELOG.md",
+		"TASK_SYSTEM_LINK=https://tracker.example/item/{code}",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(dir, "CHANGELOG.md"), "# History\n")
+
+	runner := newScriptedRunner(map[string][]runnerResult{
+		runnerKey("git", "rev-list", "--tags", "--max-count=1"): {{output: "tagcommit\n"}},
+		runnerKey("git", "describe", "--tags", "tagcommit"):     {{output: "1.2.3\n"}},
+		runnerKey("git", "rev-parse", "origin/master"):          {{output: "master123\n"}},
+		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..develop"): {{
+			output: "001|Dev One|[OPS-AB111111-CD111111] fix: исправлена проверка|2026-01-01",
+		}},
+		runnerKey("git", "cherry", "-v", "master123", "1.2.3"):               {{output: ""}},
+		runnerKey("git", "add", "./CHANGELOG.md"):                            {{}},
+		runnerKey("git", "commit", "-m", "wip: Отредактирован CHANGELOG.md"): {{}},
+	})
+
+	var output bytes.Buffer
+	input := strings.NewReader("\n\n\n")
+	app := NewApp(nil, input, &output, fixedTime, runner)
+
+	if err := app.Run(); err != nil {
+		t.Fatalf("Run() error = %v\noutput:\n%s", err, output.String())
+	}
+
+	changelog := readFile(t, filepath.Join(dir, "CHANGELOG.md"))
+	if !strings.Contains(changelog, "  - Исправлена проверка [Заявка](https://tracker.example/item/AB111111)\n") {
+		t.Fatalf("CHANGELOG.md does not contain generated change:\n%s", changelog)
+	}
+
+	for _, command := range runner.commands {
+		if len(command) >= 2 && command[0] == "git" && command[1] == "checkout" {
+			t.Fatalf("current branch mode should not checkout branches, commands = %#v", runner.commands)
+		}
+		if reflect.DeepEqual(command, []string{"git", "branch", "--list", "feature/OPS-AB111111-CD111111-assign-to-changelog"}) {
+			t.Fatalf("current branch mode should not inspect generated branch, commands = %#v", runner.commands)
+		}
+	}
+	if !strings.Contains(output.String(), "текущей ветке") {
+		t.Fatalf("output does not show changelog mode prompt:\n%s", output.String())
+	}
+}
+
+func TestAppRunUsesSavedChangelogBranchModeWithoutAsking(t *testing.T) {
+	dir := t.TempDir()
+	chdir(t, dir)
+	setUserConfigContent(t, dir, `{
+  "taskSystemLink": "https://tracker.example/item/{code}",
+  "changelogPath": "./CHANGELOG.md",
+  "taskLinkMode": "always",
+  "commitMode": "never",
+  "changelogMode": "branch"
+}
+`)
+
+	writeFile(t, filepath.Join(dir, ".env"), strings.Join([]string{
+		"REPOSITORY_LINK=https://git.example/group/app/-/tags/",
+		"CHANGELOG_PATH=./CHANGELOG.md",
+		"TASK_SYSTEM_LINK=https://tracker.example/item/{code}",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(dir, "CHANGELOG.md"), "# History\n")
+
+	branch := "feature/OPS-AB111111-CD111111-assign-to-changelog"
+	runner := newScriptedRunner(map[string][]runnerResult{
+		runnerKey("git", "rev-list", "--tags", "--max-count=1"): {{output: "tagcommit\n"}},
+		runnerKey("git", "describe", "--tags", "tagcommit"):     {{output: "1.2.3\n"}},
+		runnerKey("git", "rev-parse", "origin/master"):          {{output: "master123\n"}},
+		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..develop"): {{
+			output: "001|Dev One|[OPS-AB111111-CD111111] fix: исправлена проверка|2026-01-01",
+		}},
+		runnerKey("git", "cherry", "-v", "master123", "1.2.3"): {{output: ""}},
+		runnerKey("git", "branch", "--list", branch):           {{output: ""}},
+		runnerKey("git", "checkout", "develop"):                {{}},
+		runnerKey("git", "checkout", "-b", branch):             {{}},
+	})
+
+	var output bytes.Buffer
+	input := strings.NewReader("\n")
+	app := NewApp(nil, input, &output, fixedTime, runner)
+
+	if err := app.Run(); err != nil {
+		t.Fatalf("Run() error = %v\noutput:\n%s", err, output.String())
+	}
+
+	if strings.Contains(output.String(), "Как записать CHANGELOG.md?") {
+		t.Fatalf("output contains changelog mode prompt despite saved mode:\n%s", output.String())
+	}
+
+	wantCommands := [][]string{
+		{"git", "rev-list", "--tags", "--max-count=1"},
+		{"git", "describe", "--tags", "tagcommit"},
+		{"git", "rev-parse", "origin/master"},
+		{"git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..develop"},
+		{"git", "cherry", "-v", "master123", "1.2.3"},
+		{"git", "branch", "--list", branch},
+		{"git", "checkout", "develop"},
+		{"git", "checkout", "-b", branch},
+	}
+	if !reflect.DeepEqual(runner.commands, wantCommands) {
+		t.Fatalf("commands = %#v, want %#v", runner.commands, wantCommands)
+	}
+}
+
 func TestAppRunAcceptsDefaultYesForFinalConfirmation(t *testing.T) {
 	dir := t.TempDir()
 	chdir(t, dir)
@@ -366,7 +484,7 @@ func TestAppRunAcceptsDefaultYesForFinalConfirmation(t *testing.T) {
 	})
 
 	var output bytes.Buffer
-	input := strings.NewReader("y\n\n\n\n\nn\n\n")
+	input := strings.NewReader("\ny\n\n\n\nn\n\n")
 	app := NewApp(nil, input, &output, fixedTime, runner)
 
 	if err := app.Run(); err != nil {
@@ -461,7 +579,7 @@ func TestAppRunWritesChangelogWithoutCommitWhenCommitIsDeclined(t *testing.T) {
 	})
 
 	var output bytes.Buffer
-	input := strings.NewReader("y\n\n\n\ny\nn\n\n")
+	input := strings.NewReader("2\ny\n\n\n\ny\nn\n\n")
 	app := NewApp(nil, input, &output, fixedTime, runner)
 
 	if err := app.Run(); err != nil {

@@ -40,6 +40,12 @@ curl -fsSL https://github.com/ArturUshakov/changelogger/releases/latest/download
 changelogger
 ```
 
+Для обновления до последнего GitHub Release:
+
+```bash
+changelogger update
+```
+
 ## Глобальная настройка
 
 Создайте файл:
@@ -66,6 +72,48 @@ https://helpdesk.efko.ru
 ```
 
 Если global config отсутствует, Changelogger создаст его с этим содержимым автоматически.
+
+Настройки поведения можно менять без ручного редактирования файла:
+
+```bash
+changelogger config
+```
+
+Посмотреть текущие настройки:
+
+```bash
+changelogger config show
+```
+
+Настроить ссылки на заявки:
+
+```bash
+changelogger config task-link ask
+changelogger config task-link always
+changelogger config task-link never
+```
+
+Настроить создание commit:
+
+```bash
+changelogger config commit ask
+changelogger config commit always
+changelogger config commit never
+```
+
+Настроить способ записи changelog:
+
+```bash
+changelogger config changelog ask
+changelogger config changelog current
+changelogger config changelog branch
+```
+
+Сбросить сохраненный выбор:
+
+```bash
+changelogger config reset
+```
 
 ## Подготовка проекта для работы
 
@@ -137,7 +185,12 @@ Enter принимает рекомендацию. `1`, `2`, `3`, `major`, `mino
 
 Затем Changelogger попросит ввести номер заявки и задачи в формате `IU000000-W0111111`.
 Если нажать Enter, будет использована заявка-задача из последнего подходящего коммита.
-После этого будет создана ветка:
+Перед записью можно выбрать, как менять changelog:
+
+- записать `CHANGELOG.md` в текущей ветке;
+- перейти на `develop` и создать новую ветку.
+
+Если выбран второй вариант, будет создана ветка:
 
 ```text
 feature/MYPROJECT-IU000000-W0111111-assign-to-changelog

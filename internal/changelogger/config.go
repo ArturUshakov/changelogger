@@ -16,6 +16,7 @@ type Config struct {
 	TaskSystemLink string `json:"taskSystemLink"`
 	TaskLinkMode   string `json:"taskLinkMode,omitempty"`
 	CommitMode     string `json:"commitMode,omitempty"`
+	ChangelogMode  string `json:"changelogMode,omitempty"`
 }
 
 func LoadConfig(path string) (Config, error) {
@@ -55,6 +56,7 @@ func LoadConfigFiles(globalPath string, envPath string) (Config, error) {
 		TaskSystemLink: global.TaskSystemLink,
 		TaskLinkMode:   normalizePreferenceMode(global.TaskLinkMode),
 		CommitMode:     normalizePreferenceMode(global.CommitMode),
+		ChangelogMode:  normalizeChangelogMode(global.ChangelogMode),
 	}
 
 	if values["CHANGELOG_PATH"] != "" {
@@ -146,6 +148,17 @@ func normalizePreferenceMode(value string) string {
 		return preferenceAlways
 	case preferenceNever:
 		return preferenceNever
+	default:
+		return preferenceAsk
+	}
+}
+
+func normalizeChangelogMode(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case changelogModeCurrentBranch:
+		return changelogModeCurrentBranch
+	case changelogModeNewBranch, "branch":
+		return changelogModeNewBranch
 	default:
 		return preferenceAsk
 	}

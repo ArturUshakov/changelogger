@@ -27,6 +27,15 @@ func NewApp(args []string, input io.Reader, output io.Writer, now func() time.Ti
 }
 
 func (app App) Run() error {
+	if len(app.args) > 0 {
+		switch app.args[0] {
+		case "config":
+			return app.runConfigCommand(app.args[1:])
+		case "update":
+			return app.runUpdateCommand()
+		}
+	}
+
 	config, err := LoadConfig(".env")
 	if err != nil {
 		return err
@@ -70,6 +79,11 @@ func (app App) Run() error {
 	}
 	branchTask := DetectBranchTask(commitLines)
 
+	changelogMode, err := app.changelogChoice(config.ChangelogMode)
+	if err != nil {
+		return err
+	}
+
 	includeTaskLinks, err := app.taskLinkChoice(config.TaskLinkMode)
 	if err != nil {
 		return err
@@ -99,13 +113,16 @@ func (app App) Run() error {
 
 	app.printColored(fmt.Sprintf("Следующая версия приложения: %s \n", newVersion.String()), green)
 
-	branchName, err := app.askBranchName(config.BranchPrefix, branchTask)
-	if err != nil {
-		return err
-	}
+	branchName := ""
+	if changelogMode == changelogModeNewBranch {
+		branchName, err = app.askBranchName(config.BranchPrefix, branchTask)
+		if err != nil {
+			return err
+		}
 
-	if err := app.git.CreateBranch(branchName); err != nil {
-		return err
+		if err := app.git.CreateBranch(branchName); err != nil {
+			return err
+		}
 	}
 
 	if normalizePreferenceMode(config.CommitMode) == preferenceAsk {
@@ -132,15 +149,19 @@ func (app App) Run() error {
 	}
 	app.printColored("Коммит успешно создан!  \n", green)
 
-	if err := app.askConfirmation("Пушить ветку " + branchName + "?"); err != nil {
-		return err
+	if changelogMode == changelogModeNewBranch {
+		if err := app.askConfirmation("Пушить ветку " + branchName + "?"); err != nil {
+			return err
+		}
+
+		if err := app.git.Push(branchName); err != nil {
+			return err
+		}
+
+		return app.git.DeleteBranch(branchName)
 	}
 
-	if err := app.git.Push(branchName); err != nil {
-		return err
-	}
-
-	return app.git.DeleteBranch(branchName)
+	return nil
 }
 
 func (app App) askVersionLevel(version Version, recommendedLevel string, recommendationReason string) (string, error) {
@@ -184,6 +205,33 @@ func (app App) askBranchName(prefix string, defaultTask string) (string, error) 
 	}
 
 	return "feature/" + prefix + input + "-assign-to-changelog", nil
+}
+
+func (app App) askChangelogMode() (string, error) {
+	app.print("Как записать CHANGELOG.md?\n 1 - в текущей ветке\n 2 - перейти на develop и создать новую ветку\n Enter - в текущей ветке\n> ")
+
+	answer, err := app.readLine()
+	if err != nil {
+		return "", err
+	}
+
+	switch strings.ToLower(answer) {
+	case "2", "branch", "new-branch":
+		return changelogModeNewBranch, nil
+	default:
+		return changelogModeCurrentBranch, nil
+	}
+}
+
+func (app App) changelogChoice(mode string) (string, error) {
+	switch normalizeChangelogMode(mode) {
+	case changelogModeCurrentBranch:
+		return changelogModeCurrentBranch, nil
+	case changelogModeNewBranch:
+		return changelogModeNewBranch, nil
+	default:
+		return app.askChangelogMode()
+	}
 }
 
 func (app App) askConfirmation(question string) error {
@@ -349,4 +397,9 @@ const (
 	preferenceAsk    = "ask"
 	preferenceAlways = "always"
 	preferenceNever  = "never"
+)
+
+const (
+	changelogModeCurrentBranch = "current"
+	changelogModeNewBranch     = "new-branch"
 )
