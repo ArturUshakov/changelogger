@@ -11,7 +11,7 @@ import (
 
 func TestAppRunWritesChangelogAndRunsGitWorkflow(t *testing.T) {
 	dir := t.TempDir()
-	t.Chdir(dir)
+	chdir(t, dir)
 	setUserConfig(t, dir)
 
 	writeFile(t, filepath.Join(dir, ".env"), strings.Join([]string{
@@ -88,7 +88,7 @@ func TestAppRunWritesChangelogAndRunsGitWorkflow(t *testing.T) {
 
 func TestAppRunUsesTagLinkArgumentBeforeEnvAndGitRemote(t *testing.T) {
 	dir := t.TempDir()
-	t.Chdir(dir)
+	chdir(t, dir)
 	setUserConfig(t, dir)
 
 	writeFile(t, filepath.Join(dir, ".env"), strings.Join([]string{
@@ -138,7 +138,7 @@ func TestAppRunUsesTagLinkArgumentBeforeEnvAndGitRemote(t *testing.T) {
 
 func TestAppRunReturnsErrorWhenNoSupportedCommitsFound(t *testing.T) {
 	dir := t.TempDir()
-	t.Chdir(dir)
+	chdir(t, dir)
 	setUserConfig(t, dir)
 
 	writeFile(t, filepath.Join(dir, ".env"), strings.Join([]string{
@@ -286,4 +286,22 @@ func setUserConfig(t *testing.T, dir string) {
   "changelogPath": "./CHANGELOG.md"
 }
 `)
+}
+
+func chdir(t *testing.T, dir string) {
+	t.Helper()
+
+	previous, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Cleanup(func() {
+		if err := os.Chdir(previous); err != nil {
+			t.Fatal(err)
+		}
+	})
 }
