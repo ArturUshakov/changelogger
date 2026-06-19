@@ -115,13 +115,13 @@ func repositoryTagsLink(scheme string, host string, path string) (string, error)
 	return fmt.Sprintf("%s://%s/%s/-/tags/", scheme, host, path), nil
 }
 
-func (git Git) ChangeLines(lastTag string, masterCommit string) ([]string, error) {
+func (git Git) ChangeLines(lastTag string, masterCommit string, targetRef string) ([]string, error) {
 	logOutput, err := git.runner.Run(
 		"git",
 		"log",
 		"--pretty=format:%h|%an|%s|%cs",
 		"--no-merges",
-		lastTag+"..develop",
+		lastTag+".."+targetRef,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("получить список коммитов: %w", err)

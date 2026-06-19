@@ -133,9 +133,9 @@ func TestGitMasterCommitTrimsOutput(t *testing.T) {
 	}
 }
 
-func TestGitChangeLinesIncludesCherryLinesWhenAvailable(t *testing.T) {
+func TestGitChangeLinesUsesRequestedTargetAndIncludesCherryLinesWhenAvailable(t *testing.T) {
 	runner := newScriptedRunner(map[string][]runnerResult{
-		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..develop"): {{
+		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..HEAD"): {{
 			output: "001|Dev One|[OPS-AB111111-CD111111] feat: добавлен экспорт|2026-01-01\n",
 		}},
 		runnerKey("git", "cherry", "-v", "master123", "1.2.3"): {{
@@ -143,7 +143,7 @@ func TestGitChangeLinesIncludesCherryLinesWhenAvailable(t *testing.T) {
 		}},
 	})
 
-	lines, err := (Git{runner: runner}).ChangeLines("1.2.3", "master123")
+	lines, err := (Git{runner: runner}).ChangeLines("1.2.3", "master123", "HEAD")
 	if err != nil {
 		t.Fatalf("ChangeLines() error = %v", err)
 	}
@@ -167,7 +167,7 @@ func TestGitChangeLinesIgnoresCherryError(t *testing.T) {
 		}},
 	})
 
-	lines, err := (Git{runner: runner}).ChangeLines("1.2.3", "master123")
+	lines, err := (Git{runner: runner}).ChangeLines("1.2.3", "master123", "develop")
 	if err != nil {
 		t.Fatalf("ChangeLines() error = %v", err)
 	}

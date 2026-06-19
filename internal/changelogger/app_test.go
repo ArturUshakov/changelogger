@@ -201,7 +201,7 @@ func TestAppRunDoesNotAddTaskLinksByDefault(t *testing.T) {
 		runnerKey("git", "rev-list", "--tags", "--max-count=1"): {{output: "tagcommit\n"}},
 		runnerKey("git", "describe", "--tags", "tagcommit"):     {{output: "1.2.3\n"}},
 		runnerKey("git", "rev-parse", "origin/master"):          {{output: "master123\n"}},
-		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..develop"): {{
+		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..HEAD"): {{
 			output: "001|Dev One|[OPS-AB111111-CD111111] fix: исправлена проверка|2026-01-01",
 		}},
 		runnerKey("git", "cherry", "-v", "master123", "1.2.3"):               {{output: ""}},
@@ -249,7 +249,7 @@ func TestAppRunCanSaveTaskLinkAndCommitPreferences(t *testing.T) {
 		runnerKey("git", "rev-list", "--tags", "--max-count=1"): {{output: "tagcommit\n"}},
 		runnerKey("git", "describe", "--tags", "tagcommit"):     {{output: "1.2.3\n"}},
 		runnerKey("git", "rev-parse", "origin/master"):          {{output: "master123\n"}},
-		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..develop"): {{
+		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..HEAD"): {{
 			output: "001|Dev One|[OPS-AB111111-CD111111] fix: исправлена проверка|2026-01-01",
 		}},
 		runnerKey("git", "cherry", "-v", "master123", "1.2.3"):               {{output: ""}},
@@ -305,7 +305,7 @@ func TestAppRunUsesSavedPreferencesWithoutAskingAgain(t *testing.T) {
 		runnerKey("git", "rev-list", "--tags", "--max-count=1"): {{output: "tagcommit\n"}},
 		runnerKey("git", "describe", "--tags", "tagcommit"):     {{output: "1.2.3\n"}},
 		runnerKey("git", "rev-parse", "origin/master"):          {{output: "master123\n"}},
-		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..develop"): {{
+		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..HEAD"): {{
 			output: "001|Dev One|[OPS-AB111111-CD111111] fix: исправлена проверка|2026-01-01",
 		}},
 		runnerKey("git", "cherry", "-v", "master123", "1.2.3"): {{output: ""}},
@@ -361,7 +361,7 @@ func TestAppRunCanWriteChangelogOnCurrentBranch(t *testing.T) {
 		runnerKey("git", "rev-list", "--tags", "--max-count=1"): {{output: "tagcommit\n"}},
 		runnerKey("git", "describe", "--tags", "tagcommit"):     {{output: "1.2.3\n"}},
 		runnerKey("git", "rev-parse", "origin/master"):          {{output: "master123\n"}},
-		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..develop"): {{
+		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..HEAD"): {{
 			output: "001|Dev One|[OPS-AB111111-CD111111] fix: исправлена проверка|2026-01-01",
 		}},
 		runnerKey("git", "cherry", "-v", "master123", "1.2.3"):               {{output: ""}},
@@ -474,7 +474,7 @@ func TestAppRunAcceptsDefaultYesForFinalConfirmation(t *testing.T) {
 		runnerKey("git", "rev-list", "--tags", "--max-count=1"): {{output: "tagcommit\n"}},
 		runnerKey("git", "describe", "--tags", "tagcommit"):     {{output: "1.2.3\n"}},
 		runnerKey("git", "rev-parse", "origin/master"):          {{output: "master123\n"}},
-		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..develop"): {{
+		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..HEAD"): {{
 			output: "001|Dev One|[OPS-AB111111-CD111111] fix: исправлена проверка|2026-01-01",
 		}},
 		runnerKey("git", "cherry", "-v", "master123", "1.2.3"): {{output: ""}},
@@ -524,7 +524,7 @@ func TestAppRunSkipsFinalConfirmationWhenCommitPreferenceIsSaved(t *testing.T) {
 		runnerKey("git", "rev-list", "--tags", "--max-count=1"): {{output: "tagcommit\n"}},
 		runnerKey("git", "describe", "--tags", "tagcommit"):     {{output: "1.2.3\n"}},
 		runnerKey("git", "rev-parse", "origin/master"):          {{output: "master123\n"}},
-		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..develop"): {{
+		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..HEAD"): {{
 			output: "001|Dev One|[OPS-AB111111-CD111111] fix: исправлена проверка|2026-01-01",
 		}},
 		runnerKey("git", "cherry", "-v", "master123", "1.2.3"): {{output: ""}},
@@ -627,7 +627,7 @@ func TestAppRunReturnsErrorWhenNoSupportedCommitsFound(t *testing.T) {
 		runnerKey("git", "rev-list", "--tags", "--max-count=1"): {{output: "tagcommit\n"}},
 		runnerKey("git", "describe", "--tags", "tagcommit"):     {{output: "1.2.3\n"}},
 		runnerKey("git", "rev-parse", "origin/master"):          {{output: "master123\n"}},
-		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..develop"): {{
+		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..HEAD"): {{
 			output: "001|Dev One|[OPS-AB111111-CD111111] docs: обновлена справка|2026-01-01",
 		}},
 		runnerKey("git", "cherry", "-v", "master123", "1.2.3"): {{output: ""}},

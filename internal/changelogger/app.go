@@ -69,7 +69,17 @@ func (app App) Run() error {
 		return err
 	}
 
-	commitLines, err := app.git.ChangeLines(version.String(), masterCommit)
+	changelogMode, err := app.changelogChoice(config.ChangelogMode)
+	if err != nil {
+		return err
+	}
+
+	changeTarget := "HEAD"
+	if changelogMode == changelogModeNewBranch {
+		changeTarget = "develop"
+	}
+
+	commitLines, err := app.git.ChangeLines(version.String(), masterCommit, changeTarget)
 	if err != nil {
 		return err
 	}
@@ -78,11 +88,6 @@ func (app App) Run() error {
 		config.BranchPrefix = DetectBranchPrefix(commitLines)
 	}
 	branchTask := DetectBranchTask(commitLines)
-
-	changelogMode, err := app.changelogChoice(config.ChangelogMode)
-	if err != nil {
-		return err
-	}
 
 	includeTaskLinks, err := app.taskLinkChoice(config.TaskLinkMode)
 	if err != nil {
@@ -95,7 +100,7 @@ func (app App) Run() error {
 	changelog := NewChangelog(config, app.now)
 	answerBody := changelog.Body(commitLines)
 	if answerBody == "" {
-		return fmt.Errorf("отсутствуют коммиты с нужными тэгами")
+		return fmt.Errorf("отсутствуют коммиты с поддерживаемыми префиксами")
 	}
 
 	app.printColored("Изменения которые попадут в CHANGELOG.md: \n"+answerBody+" \n", yellow)
