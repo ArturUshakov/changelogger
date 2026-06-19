@@ -36,6 +36,15 @@ func (app App) Run() error {
 		config.RepositoryLink = app.args[0]
 	}
 
+	if config.RepositoryLink == "" {
+		repositoryLink, err := app.git.RepositoryLink()
+		if err != nil {
+			return err
+		}
+
+		config.RepositoryLink = repositoryLink
+	}
+
 	lastTag, err := app.git.LastTag()
 	if err != nil {
 		return err
@@ -51,19 +60,26 @@ func (app App) Run() error {
 		return err
 	}
 
-	branchName, err := app.askBranchName(config.BranchPrefix)
+	commitLines, err := app.git.ChangeLines(version.String(), masterCommit)
 	if err != nil {
 		return err
 	}
 
-	if err := app.git.CreateBranch(branchName); err != nil {
-		return err
+	if config.BranchPrefix == "" {
+		config.BranchPrefix = DetectBranchPrefix(commitLines)
+	}
+	branchTask := DetectBranchTask(commitLines)
+
+	changelog := NewChangelog(config, app.now)
+	answerBody := changelog.Body(commitLines)
+	if answerBody == "" {
+		return fmt.Errorf("отсутствуют коммиты с нужными тэгами")
 	}
 
-	app.printColored(fmt.Sprintf("Текущая версия приложения: %s\n", version.String()), yellow)
-	app.print("Какую версию нужно поднять?\n 1 - major (*.0.0)\n 2 - minor (0.*.0)\n 3 - fix   (0.0.*)  - ")
+	app.printColored("Изменения которые попадут в CHANGELOG.md: \n"+answerBody+" \n", yellow)
 
-	level, err := app.readLine()
+	recommendedLevel, recommendationReason := RecommendVersionLevel(commitLines)
+	level, err := app.askVersionLevel(version, recommendedLevel, recommendationReason)
 	if err != nil {
 		return err
 	}
@@ -75,18 +91,14 @@ func (app App) Run() error {
 
 	app.printColored(fmt.Sprintf("Следующая версия приложения: %s \n", newVersion.String()), green)
 
-	commitLines, err := app.git.ChangeLines(version.String(), masterCommit)
+	branchName, err := app.askBranchName(config.BranchPrefix, branchTask)
 	if err != nil {
 		return err
 	}
 
-	changelog := NewChangelog(config, app.now)
-	answerBody := changelog.Body(commitLines)
-	if answerBody == "" {
-		return fmt.Errorf("отсутствуют коммиты с нужными тэгами")
+	if err := app.git.CreateBranch(branchName); err != nil {
+		return err
 	}
-
-	app.printColored("Изменения которые попадут в CHANGELOG.md: \n"+answerBody+" \n", yellow)
 
 	if err := app.askConfirmation("Все верно?"); err != nil {
 		return err
@@ -117,12 +129,36 @@ func (app App) Run() error {
 	return app.git.DeleteBranch(branchName)
 }
 
-func (app App) askBranchName(prefix string) (string, error) {
-	app.printColored(`Введите номер заявки и задачи (в формате Заявка-Задача, например "IU888000-W0999000"): `, yellow)
+func (app App) askVersionLevel(version Version, recommendedLevel string, recommendationReason string) (string, error) {
+	app.printColored(fmt.Sprintf("Текущая версия приложения: %s\n", version.String()), yellow)
+	app.printColored(fmt.Sprintf("Рекомендация: %s (%s)\n", recommendedLevel, recommendationReason), green)
+	app.print("Какую версию нужно поднять?\n 1 - major (*.0.0)\n 2 - minor (0.*.0)\n 3 - fix   (0.0.*)\n Enter - " + recommendedLevel + "\n> ")
+
+	level, err := app.readLine()
+	if err != nil {
+		return "", err
+	}
+	if level == "" {
+		return recommendedLevel, nil
+	}
+
+	return level, nil
+}
+
+func (app App) askBranchName(prefix string, defaultTask string) (string, error) {
+	prompt := `Введите номер заявки и задачи (в формате Заявка-Задача, например "IU888000-W0999000")`
+	if defaultTask != "" {
+		prompt += "\nEnter - " + defaultTask
+	}
+	prompt += ": "
+	app.printColored(prompt, yellow)
 
 	input, err := app.readLine()
 	if err != nil {
 		return "", err
+	}
+	if input == "" && defaultTask != "" {
+		input = defaultTask
 	}
 
 	if !validBranchTask(input) {

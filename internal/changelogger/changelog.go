@@ -28,6 +28,7 @@ func NewChangelog(config Config, now func() time.Time) Changelog {
 
 func (changelog Changelog) Body(lines []string) string {
 	grouped := make(map[string][]string)
+	seen := make(map[string]map[string]bool)
 
 	for _, line := range lines {
 		change, ok := ParseCommitLine(line)
@@ -42,10 +43,18 @@ func (changelog Changelog) Body(lines []string) string {
 
 		description := UppercaseFirst(strings.TrimSpace(change.Description))
 		if taskCode := ExtractTaskCode(change.TaskRaw); taskCode != "" {
-			if taskLink := changelog.taskLink(taskCode); taskLink != "" && changelog.config.TaskSystemName != "" {
-				description += " [Заявка " + changelog.config.TaskSystemName + "](" + taskLink + ")"
+			if taskLink := changelog.taskLink(taskCode); taskLink != "" {
+				description += " [Заявка](" + taskLink + ")"
 			}
 		}
+
+		if seen[title] == nil {
+			seen[title] = make(map[string]bool)
+		}
+		if seen[title][description] {
+			continue
+		}
+		seen[title][description] = true
 
 		grouped[title] = append(grouped[title], description)
 	}
@@ -129,6 +138,85 @@ func ParseCommitSubject(subject string) (CommitChange, bool) {
 
 func ExtractTaskCode(raw string) string {
 	return taskCodePattern.FindString(raw)
+}
+
+func ExtractBranchPrefix(raw string) string {
+	taskCodeIndex := taskCodePattern.FindStringIndex(raw)
+	if taskCodeIndex == nil || taskCodeIndex[0] == 0 {
+		return ""
+	}
+
+	return strings.Trim(raw[:taskCodeIndex[0]], "-_ /")
+}
+
+func ExtractBranchTask(raw string) string {
+	taskCodeIndex := taskCodePattern.FindStringIndex(raw)
+	if taskCodeIndex == nil {
+		return ""
+	}
+
+	task := strings.Trim(raw[taskCodeIndex[0]:], "-_ /")
+	if !validBranchTask(task) {
+		return ""
+	}
+
+	return task
+}
+
+func DetectBranchTask(lines []string) string {
+	for index := len(lines) - 1; index >= 0; index-- {
+		change, ok := ParseCommitLine(lines[index])
+		if !ok {
+			continue
+		}
+
+		task := ExtractBranchTask(change.TaskRaw)
+		if task != "" {
+			return task
+		}
+	}
+
+	return ""
+}
+
+func DetectBranchPrefix(lines []string) string {
+	prefixes := make(map[string]bool)
+	for _, line := range lines {
+		change, ok := ParseCommitLine(line)
+		if !ok {
+			continue
+		}
+
+		prefix := ExtractBranchPrefix(change.TaskRaw)
+		if prefix != "" {
+			prefixes[prefix] = true
+		}
+	}
+
+	if len(prefixes) != 1 {
+		return ""
+	}
+
+	for prefix := range prefixes {
+		return prefix
+	}
+
+	return ""
+}
+
+func RecommendVersionLevel(lines []string) (string, string) {
+	for _, line := range lines {
+		change, ok := ParseCommitLine(line)
+		if !ok {
+			continue
+		}
+
+		if change.Kind == "feat" {
+			return "minor", "есть feat"
+		}
+	}
+
+	return "fix", "нет feat"
 }
 
 func UppercaseFirst(value string) string {
