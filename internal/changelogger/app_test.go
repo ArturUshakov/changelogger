@@ -44,7 +44,7 @@ func TestAppRunWritesChangelogAndRunsGitWorkflow(t *testing.T) {
 	})
 
 	var output bytes.Buffer
-	input := strings.NewReader("\n\ny\ny\ny\n")
+	input := strings.NewReader("y\n\n\ny\ny\ny\n")
 	app := NewApp(nil, input, &output, fixedTime, runner)
 
 	if err := app.Run(); err != nil {
@@ -117,7 +117,7 @@ func TestAppRunUsesTagLinkArgumentBeforeEnvAndGitRemote(t *testing.T) {
 		runnerKey("git", "branch", "-D", branch):                             {{}},
 	})
 
-	input := strings.NewReader("\n\ny\ny\ny\n")
+	input := strings.NewReader("y\n\n\ny\ny\ny\n")
 	app := NewApp([]string{"https://git.example/group/arg-app/-/tags/"}, input, &bytes.Buffer{}, fixedTime, runner)
 
 	if err := app.Run(); err != nil {
@@ -133,6 +133,163 @@ func TestAppRunUsesTagLinkArgumentBeforeEnvAndGitRemote(t *testing.T) {
 		if reflect.DeepEqual(command, []string{"git", "remote", "get-url", "origin"}) {
 			t.Fatal("Run() called git remote even though repository link argument was provided")
 		}
+	}
+}
+
+func TestAppRunCanWriteChangelogWithoutTaskLinks(t *testing.T) {
+	dir := t.TempDir()
+	chdir(t, dir)
+	setUserConfig(t, dir)
+
+	writeFile(t, filepath.Join(dir, ".env"), strings.Join([]string{
+		"REPOSITORY_LINK=https://git.example/group/app/-/tags/",
+		"CHANGELOG_PATH=./CHANGELOG.md",
+		"TASK_SYSTEM_LINK=https://tracker.example/item/{code}",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(dir, "CHANGELOG.md"), "# History\n")
+
+	branch := "feature/OPS-AB111111-CD111111-assign-to-changelog"
+	runner := newScriptedRunner(map[string][]runnerResult{
+		runnerKey("git", "rev-list", "--tags", "--max-count=1"): {{output: "tagcommit\n"}},
+		runnerKey("git", "describe", "--tags", "tagcommit"):     {{output: "1.2.3\n"}},
+		runnerKey("git", "rev-parse", "origin/master"):          {{output: "master123\n"}},
+		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..develop"): {{
+			output: "001|Dev One|[OPS-AB111111-CD111111] fix: исправлена проверка|2026-01-01",
+		}},
+		runnerKey("git", "cherry", "-v", "master123", "1.2.3"):               {{output: ""}},
+		runnerKey("git", "branch", "--list", branch):                         {{output: ""}},
+		runnerKey("git", "checkout", "develop"):                              {{}, {}},
+		runnerKey("git", "checkout", "-b", branch):                           {{}},
+		runnerKey("git", "add", "./CHANGELOG.md"):                            {{}},
+		runnerKey("git", "commit", "-m", "wip: Отредактирован CHANGELOG.md"): {{}},
+		runnerKey("git", "push", "origin", branch):                           {{}},
+		runnerKey("git", "branch", "-D", branch):                             {{}},
+	})
+
+	input := strings.NewReader("n\n\n\ny\ny\ny\n")
+	app := NewApp(nil, input, &bytes.Buffer{}, fixedTime, runner)
+
+	if err := app.Run(); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	changelog := readFile(t, filepath.Join(dir, "CHANGELOG.md"))
+	if strings.Contains(changelog, "[Заявка]") || strings.Contains(changelog, "tracker.example") {
+		t.Fatalf("changelog contains task link even though links were disabled:\n%s", changelog)
+	}
+	if !strings.Contains(changelog, "  - Исправлена проверка\n") {
+		t.Fatalf("changelog does not contain plain change description:\n%s", changelog)
+	}
+}
+
+func TestAppRunDoesNotAddTaskLinksByDefault(t *testing.T) {
+	dir := t.TempDir()
+	chdir(t, dir)
+	setUserConfig(t, dir)
+
+	writeFile(t, filepath.Join(dir, ".env"), strings.Join([]string{
+		"REPOSITORY_LINK=https://git.example/group/app/-/tags/",
+		"CHANGELOG_PATH=./CHANGELOG.md",
+		"TASK_SYSTEM_LINK=https://tracker.example/item/{code}",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(dir, "CHANGELOG.md"), "# History\n")
+
+	branch := "feature/OPS-AB111111-CD111111-assign-to-changelog"
+	runner := newScriptedRunner(map[string][]runnerResult{
+		runnerKey("git", "rev-list", "--tags", "--max-count=1"): {{output: "tagcommit\n"}},
+		runnerKey("git", "describe", "--tags", "tagcommit"):     {{output: "1.2.3\n"}},
+		runnerKey("git", "rev-parse", "origin/master"):          {{output: "master123\n"}},
+		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..develop"): {{
+			output: "001|Dev One|[OPS-AB111111-CD111111] fix: исправлена проверка|2026-01-01",
+		}},
+		runnerKey("git", "cherry", "-v", "master123", "1.2.3"):               {{output: ""}},
+		runnerKey("git", "branch", "--list", branch):                         {{output: ""}},
+		runnerKey("git", "checkout", "develop"):                              {{}, {}},
+		runnerKey("git", "checkout", "-b", branch):                           {{}},
+		runnerKey("git", "add", "./CHANGELOG.md"):                            {{}},
+		runnerKey("git", "commit", "-m", "wip: Отредактирован CHANGELOG.md"): {{}},
+		runnerKey("git", "push", "origin", branch):                           {{}},
+		runnerKey("git", "branch", "-D", branch):                             {{}},
+	})
+
+	var output bytes.Buffer
+	input := strings.NewReader("\n\n\ny\ny\ny\n")
+	app := NewApp(nil, input, &output, fixedTime, runner)
+
+	if err := app.Run(); err != nil {
+		t.Fatalf("Run() error = %v\noutput:\n%s", err, output.String())
+	}
+
+	changelog := readFile(t, filepath.Join(dir, "CHANGELOG.md"))
+	if strings.Contains(changelog, "[Заявка]") || strings.Contains(changelog, "tracker.example") {
+		t.Fatalf("changelog contains task link even though default answer was used:\n%s", changelog)
+	}
+	if !strings.Contains(output.String(), "Enter - n") {
+		t.Fatalf("output does not show default answer for task links:\n%s", output.String())
+	}
+}
+
+func TestAppRunWritesChangelogWithoutCommitWhenCommitIsDeclined(t *testing.T) {
+	dir := t.TempDir()
+	chdir(t, dir)
+	setUserConfig(t, dir)
+
+	writeFile(t, filepath.Join(dir, ".env"), strings.Join([]string{
+		"REPOSITORY_LINK=https://git.example/group/app/-/tags/",
+		"CHANGELOG_PATH=./CHANGELOG.md",
+		"TASK_SYSTEM_LINK=https://tracker.example/item/{code}",
+		"",
+	}, "\n"))
+	initialChangelog := "# History\n"
+	writeFile(t, filepath.Join(dir, "CHANGELOG.md"), initialChangelog)
+
+	branch := "feature/OPS-AB111111-CD111111-assign-to-changelog"
+	runner := newScriptedRunner(map[string][]runnerResult{
+		runnerKey("git", "rev-list", "--tags", "--max-count=1"): {{output: "tagcommit\n"}},
+		runnerKey("git", "describe", "--tags", "tagcommit"):     {{output: "1.2.3\n"}},
+		runnerKey("git", "rev-parse", "origin/master"):          {{output: "master123\n"}},
+		runnerKey("git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..develop"): {{
+			output: "001|Dev One|[OPS-AB111111-CD111111] fix: исправлена проверка|2026-01-01",
+		}},
+		runnerKey("git", "cherry", "-v", "master123", "1.2.3"): {{output: ""}},
+		runnerKey("git", "branch", "--list", branch):           {{output: ""}},
+		runnerKey("git", "checkout", "develop"):                {{}},
+		runnerKey("git", "checkout", "-b", branch):             {{}},
+	})
+
+	var output bytes.Buffer
+	input := strings.NewReader("y\n\n\ny\nn\n")
+	app := NewApp(nil, input, &output, fixedTime, runner)
+
+	if err := app.Run(); err != nil {
+		t.Fatalf("Run() error = %v\noutput:\n%s", err, output.String())
+	}
+
+	changelog := readFile(t, filepath.Join(dir, "CHANGELOG.md"))
+	if changelog == initialChangelog {
+		t.Fatal("CHANGELOG.md was not changed after commit was declined")
+	}
+	if !strings.Contains(changelog, "  - Исправлена проверка [Заявка](https://tracker.example/item/AB111111)\n") {
+		t.Fatalf("CHANGELOG.md does not contain generated change:\n%s", changelog)
+	}
+
+	wantCommands := [][]string{
+		{"git", "rev-list", "--tags", "--max-count=1"},
+		{"git", "describe", "--tags", "tagcommit"},
+		{"git", "rev-parse", "origin/master"},
+		{"git", "log", "--pretty=format:%h|%an|%s|%cs", "--no-merges", "1.2.3..develop"},
+		{"git", "cherry", "-v", "master123", "1.2.3"},
+		{"git", "branch", "--list", branch},
+		{"git", "checkout", "develop"},
+		{"git", "checkout", "-b", branch},
+	}
+	if !reflect.DeepEqual(runner.commands, wantCommands) {
+		t.Fatalf("commands = %#v, want %#v", runner.commands, wantCommands)
+	}
+	if strings.Contains(output.String(), "Ошибка") || strings.Contains(output.String(), "не изменен") {
+		t.Fatalf("output contains an error-like message after commit was declined:\n%s", output.String())
 	}
 }
 

@@ -70,6 +70,14 @@ func (app App) Run() error {
 	}
 	branchTask := DetectBranchTask(commitLines)
 
+	includeTaskLinks, err := app.askYesNoWithDefaultNo("Добавлять ссылку на заявку в CHANGELOG.md?")
+	if err != nil {
+		return err
+	}
+	if !includeTaskLinks {
+		config.TaskSystemLink = ""
+	}
+
 	changelog := NewChangelog(config, app.now)
 	answerBody := changelog.Body(commitLines)
 	if answerBody == "" {
@@ -109,8 +117,12 @@ func (app App) Run() error {
 	}
 	app.printColored("Файл CHANGELOG.md успешно отредактирован:  \n", green)
 
-	if err := app.askConfirmation("Создать коммит?"); err != nil {
+	shouldCommit, err := app.askYesNo("Создать коммит?")
+	if err != nil {
 		return err
+	}
+	if !shouldCommit {
+		return nil
 	}
 
 	if err := app.git.Commit(config.ChangelogPath); err != nil {
@@ -173,18 +185,41 @@ func (app App) askBranchName(prefix string, defaultTask string) (string, error) 
 }
 
 func (app App) askConfirmation(question string) error {
-	app.print(question + " (y/n): ")
-
-	answer, err := app.readLine()
+	confirmed, err := app.askYesNo(question)
 	if err != nil {
 		return err
 	}
 
+	if confirmed {
+		return nil
+	}
+
+	return fmt.Errorf("выполнение команды отменено")
+}
+
+func (app App) askYesNo(question string) (bool, error) {
+	app.print(question + " (y/n): ")
+
+	return app.readYesNo()
+}
+
+func (app App) askYesNoWithDefaultNo(question string) (bool, error) {
+	app.print(question + " (y/n, Enter - n): ")
+
+	return app.readYesNo()
+}
+
+func (app App) readYesNo() (bool, error) {
+	answer, err := app.readLine()
+	if err != nil {
+		return false, err
+	}
+
 	switch strings.ToLower(answer) {
 	case "y", "yes":
-		return nil
+		return true, nil
 	default:
-		return fmt.Errorf("выполнение команды отменено")
+		return false, nil
 	}
 }
 
