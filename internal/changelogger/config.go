@@ -10,9 +10,9 @@ import (
 )
 
 type Config struct {
-	RepositoryLink string `json:"repositoryLink"`
+	RepositoryLink string `json:"repositoryLink,omitempty"`
 	ChangelogPath  string `json:"changelogPath"`
-	BranchPrefix   string `json:"branchPrefix"`
+	BranchPrefix   string `json:"branchPrefix,omitempty"`
 	TaskSystemLink string `json:"taskSystemLink"`
 	TaskLinkMode   string `json:"taskLinkMode,omitempty"`
 	CommitMode     string `json:"commitMode,omitempty"`
@@ -72,12 +72,12 @@ func LoadConfigFiles(globalPath string, envPath string) (Config, error) {
 }
 
 func globalConfigPath() (string, error) {
-	configDir, err := os.UserConfigDir()
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return "", fmt.Errorf("получить каталог конфигурации пользователя: %w", err)
+		return "", fmt.Errorf("получить домашний каталог пользователя: %w", err)
 	}
 
-	return filepath.Join(configDir, "changelogger", "config.json"), nil
+	return filepath.Join(homeDir, ".config", "changelogger", "config.json"), nil
 }
 
 func readGlobalConfig(path string) (Config, error) {
@@ -107,6 +107,9 @@ func writeGlobalConfigTemplate(path string, config Config) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return fmt.Errorf("создать каталог глобального config %s: %w", filepath.Dir(path), err)
 	}
+
+	config.RepositoryLink = ""
+	config.BranchPrefix = ""
 
 	content, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {

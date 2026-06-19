@@ -176,6 +176,51 @@ func TestReadGlobalConfigCreatesDefaultWhenMissing(t *testing.T) {
 	}
 }
 
+func TestWriteGlobalConfigTemplateOmitsProjectOnlyFields(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+
+	err := writeGlobalConfigTemplate(path, Config{
+		RepositoryLink: "https://git.example/group/app/-/tags/",
+		BranchPrefix:   "OPS",
+		TaskSystemLink: "https://tracker.example/item/{code}",
+		ChangelogPath:  "./CHANGELOG.md",
+		TaskLinkMode:   "always",
+		CommitMode:     "never",
+	})
+	if err != nil {
+		t.Fatalf("writeGlobalConfigTemplate() error = %v", err)
+	}
+
+	content := readFile(t, path)
+	for _, forbidden := range []string{"repositoryLink", "branchPrefix"} {
+		if strings.Contains(content, forbidden) {
+			t.Fatalf("global config contains project-only field %q:\n%s", forbidden, content)
+		}
+	}
+	for _, want := range []string{"taskSystemLink", "changelogPath", "taskLinkMode", "commitMode"} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("global config does not contain %q:\n%s", want, content)
+		}
+	}
+}
+
+func TestGlobalConfigPathUsesHomeDotConfig(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(t.TempDir(), "xdg-config"))
+	t.Setenv("APPDATA", filepath.Join(t.TempDir(), "appdata"))
+
+	path, err := globalConfigPath()
+	if err != nil {
+		t.Fatalf("globalConfigPath() error = %v", err)
+	}
+
+	want := filepath.Join(home, ".config", "changelogger", "config.json")
+	if path != want {
+		t.Fatalf("globalConfigPath() = %q, want %q", path, want)
+	}
+}
+
 func TestExampleGlobalConfigIsJSON(t *testing.T) {
 	example := exampleGlobalConfig()
 

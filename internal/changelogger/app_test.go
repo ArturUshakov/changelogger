@@ -650,12 +650,12 @@ func setUserConfigContent(t *testing.T, dir string, content string) {
 func globalConfigFile(t *testing.T) string {
 	t.Helper()
 
-	configDir, err := os.UserConfigDir()
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return filepath.Join(configDir, "changelogger", "config.json")
+	return filepath.Join(homeDir, ".config", "changelogger", "config.json")
 }
 
 func chdir(t *testing.T, dir string) {
