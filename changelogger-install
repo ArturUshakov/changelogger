@@ -2,7 +2,7 @@
 set -eu
 
 app_name="changelogger"
-base_url="${CHANGELOGGER_BASE_URL:-https://github.com/ArturUshakov/changelogger/releases/latest/download}"
+base_url="${CHANGELOGGER_BASE_URL:-https://github.com/SolasWyrd/changelogger/releases/latest/download}"
 install_dir="${CHANGELOGGER_INSTALL_DIR:-/usr/local/bin}"
 
 info() {

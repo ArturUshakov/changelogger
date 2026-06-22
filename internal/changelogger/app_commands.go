@@ -260,7 +260,7 @@ func changelogModeLabel(mode string) string {
 const updateInstallCommand = `set -eu
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT INT TERM
-url="${CHANGELOGGER_INSTALL_URL:-https://github.com/ArturUshakov/changelogger/releases/latest/download/changelogger-install}"
+url="${CHANGELOGGER_INSTALL_URL:-https://github.com/SolasWyrd/changelogger/releases/latest/download/changelogger-install}"
 installer="$tmp_dir/changelogger-install"
 
 if command -v curl >/dev/null 2>&1; then

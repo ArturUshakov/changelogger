@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/ArturUshakov/changelogger/internal/changelogger"
+	"github.com/SolasWyrd/changelogger/internal/changelogger"
 )
 
 func main() {

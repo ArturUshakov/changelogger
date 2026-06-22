@@ -1,3 +1,3 @@
-module github.com/ArturUshakov/changelogger
+module github.com/SolasWyrd/changelogger
 
 go 1.22
